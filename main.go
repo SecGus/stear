@@ -2,28 +2,34 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
-	"io"
 	"os"
 )
 
+var silent bool
+
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Println("Usage: go-trace <output_file>")
+	deleteFlag := flag.Bool("d", false, "Delete lines from output.txt if they are not in the current command output")
+	flag.BoolVar(&silent, "s", false, "Run in silent mode (suppress output)")
+
+	flag.Parse()
+
+	if len(flag.Args()) != 1 {
+		printError("Usage: go-trace [-d] [-s/--silent] <output_file>")
 		os.Exit(1)
 	}
 
-	outputFile := os.Args[1]
+	outputFile := flag.Args()[0]
 
 	previousOutput, err := readLines(outputFile)
 	if err != nil {
-		fmt.Printf("Error reading previous output: %v\n", err)
+		printError(fmt.Sprintf("Error reading previous output: %v", err))
 		os.Exit(1)
 	}
 
 	currentOutput := readFromStdin()
 
-	// Use map for quick lookup
 	currentOutputSet := make(map[string]bool)
 	for _, domain := range currentOutput {
 		currentOutputSet[domain] = true
@@ -34,14 +40,23 @@ func main() {
 		if _, exists := currentOutputSet[domain]; exists {
 			newOutput = append(newOutput, domain)
 		} else {
-			fmt.Printf("Domain no longer returned: %s\n", domain)
+			printError(fmt.Sprintf("%s", domain))
+			if !*deleteFlag {
+				newOutput = append(newOutput, domain)
+			}
 		}
 	}
 
 	err = writeLines(outputFile, newOutput)
 	if err != nil {
-		fmt.Printf("Error writing to output file: %v\n", err)
+		printError(fmt.Sprintf("Error writing to output file: %v", err))
 		os.Exit(1)
+	}
+}
+
+func printError(message string) {
+	if !silent {
+		fmt.Println(message)
 	}
 }
 
